@@ -1,0 +1,29 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=4325
+
+This script will convert a file to a highlighted version using ANSI escape codes and print it to your terminal, like cat only with colors.
+
+This script is part of the vimpager project, which itself is available on vim.org here:
+
+http://www.vim.org/scripts/script.php?script_id=1723
+
+The project is hosted on GitHub, where you can file issues and submit pull requests:
+
+https://github.com/rkitover/vimpager
+
+ACKNOWLEDGEMENTS:
+
+Most of the code in this script is not mine, I only fixed some minor OS compatibility issues.
+
+The following people are responsible for this functionality:
+
+Original vim script for highlighting with ANSI codes, AnsiHighlight by:
+
+Matthew Wozniski (mjw@drexel.edu)
+
+Original conversion to shell script by:
+
+Magnus Woldrich: https://github.com/trapd00r/utils/blob/master/_v
+
+Fixes to the highlighting code to make the utility actually usable (and not bleed the background color etc.) by:
+
+krijesta: Chris Chambers <krijesta@google.com>
