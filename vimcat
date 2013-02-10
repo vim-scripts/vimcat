@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #!/usr/bin/env vim
 #! This is a bash script that executes itself as a vimscript to do its work
 #! Based on _v by Magnus Woldrich: https://github.com/trapd00r/utils/blob/master/_v
@@ -38,7 +38,7 @@
       cat ${tmp_file}
       echo
     else
-      echo "vcat: Cannot read file: ${file}" >&2
+      echo "$0: Cannot read file: ${file}" >&2
     fi
   done
 
@@ -165,6 +165,8 @@ function! s:GroupToAnsi(groupnum)
     let retv .= ";9" . (fg - 8)
   elseif exists('fg')                "use xterm256 codes
     let retv .= ";38;5;" . fg
+  else
+    let retv .= ";39"
   endif
 
   if exists('bg') && bg < 8
