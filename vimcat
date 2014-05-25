@@ -41,8 +41,13 @@
 
   # hopefully we're now POSIX
 
-  tmp_file=/tmp/vimcat_${$}
-  trap "rm -f ${tmp_file}" HUP INT QUIT ILL TRAP KILL BUS TERM
+  tmp_dir=/tmp/vimcat_${$}
+  mkdir -m 700 ${tmp_dir} || {
+    echo Could not create temporary directory ${tmp_dir} >&2
+    exit 1
+  }
+  trap "rm -rf ${tmp_dir}" HUP INT QUIT ILL TRAP KILL BUS TERM
+  tmp_file=${tmp_dir}/vimcat
 
   script=$(command -v ${0})
 
@@ -80,15 +85,17 @@
 
     # Check that the file exists
     if test -r "${file}" -a -f "${file}"; then
-      vim -E -X -R -i NONE $vimcatrc_arg -c "source ${script} | ${extra_c} | visual | call AnsiHighlight(\"${tmp_file}\") | q" "${file}" </dev/tty >/dev/null 2>&1
-      cat ${tmp_file}
-      echo
+      if test -s "${file}"; then
+        vim -E -X -R -i NONE $vimcatrc_arg -c "source ${script} | ${extra_c} | visual | call AnsiHighlight(\"${tmp_file}\") | q" "${file}" </dev/tty >/dev/null 2>&1
+        cat ${tmp_file}
+        echo
+      fi
     else
       echo "$0: Cannot read file: ${file}" >&2
     fi
   done
 
-  rm -f "${tmp_file}"
+  rm -rf "${tmp_dir}"
 
   exit
 
