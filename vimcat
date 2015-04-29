@@ -8,30 +8,43 @@
   if [ ! -t 1 ]; then
     exec cat "${@}"
   fi
-# try to find a better shell, especially on Solaris
+  # try to find a better shell, especially on Solaris
 
   PATH=$PATH:/usr/local/bin:/opt/csw/bin:/opt/local/bin:/usr/dt/bin:/usr/xpg4/bin:/usr/bin:/bin
+
+  _MY_SHELL=/bin/sh
+  export _MY_SHELL
 
   if [ -z "$IN_BASH" ] && command -v bash >/dev/null; then
     IN_BASH=1
     export IN_BASH
+    _MY_SHELL=`command -v bash`
+    export _MY_SHELL
     exec bash "$0" "$@"
   elif [ -z "$IN_BASH" ] && [ -z "$IN_KSH" ]; then
     if command -v dtksh >/dev/null; then
       IN_KSH=1
       export IN_KSH
+      _MY_SHELL=`command -v dtksh`
+      export _MY_SHELL
       exec dtksh "$0" "$@"
     elif [ -x /usr/xpg4/bin/sh ]; then
       IN_KSH=1
       export IN_KSH
+      _MY_SHELL=/usr/xpg4/bin/sh
+      export _MY_SHELL
       exec /usr/xpg4/bin/sh "$0" "$@"
     elif command -v ksh93 >/dev/null; then
       IN_KSH=1
       export IN_KSH
+      _MY_SHELL=`command -v ksh93`
+      export _MY_SHELL
       exec ksh93 "$0" "$@"
     elif command -v ksh >/dev/null; then
       IN_KSH=1
       export IN_KSH
+      _MY_SHELL=`command -v ksh`
+      export _MY_SHELL
       exec ksh "$0" "$@"
     else
       echo "$0 requires either bash or ksh" >&2
@@ -39,13 +52,29 @@
     fi
   fi
 
-  # hopefully we're now POSIX
+  # hopefully we're now POSIX, and shell is saved in ${_MY_SHELL}
 
-  tmp_dir=/tmp/vimcat_${$}
-  mkdir -m 700 ${tmp_dir} || {
+  tmp_dir=/tmp
+  mkdir_options="-m 700"
+
+  case $(uname -s) in
+    MINGW*|MSYS*)
+      if [ -n "${temp}" ]; then
+        # MSYS2 is a little tricky, we're gonna stick to the user's private temp
+        # the -m mode switch to mkdir doesn't work
+        tmp_dir=$(cygpath --unix "${temp}")
+        mkdir_options=""
+      fi
+    ;;
+  esac
+
+  tmp_dir="${tmp_dir}/vimcat_${$}"
+
+  if ! mkdir ${mkdir_options} ${tmp_dir}; then
     echo Could not create temporary directory ${tmp_dir} >&2
     exit 1
-  }
+  fi 
+
   trap "rm -rf ${tmp_dir}" HUP INT QUIT ILL TRAP KILL BUS TERM
   tmp_file=${tmp_dir}/vimcat
 
@@ -54,9 +83,40 @@
   # check for arguments to pass to vim
   while [ $# -gt 0 ] ; do
     case "${1}" in
-      "-c") shift; extra_c="${1}"; shift ;;
-        -*) echo "bad option '${1}'" ; exit 1 ;;
-         *) break ;;
+      "-c")
+        shift
+        if [ -z "${extra_c}" ]; then
+          extra_c="${1}"
+        else
+          extra_c="${extra_c} | ${1}"
+        fi
+        shift
+        ;;
+      "--cmd")
+        shift
+        if [ -z "${extra_cmd}" ]; then
+          extra_cmd="${1}"
+        else
+          extra_cmd="${extra_cmd} | ${1}"
+        fi
+        shift
+        ;;
+      "-u")
+        shift
+        vimcatrc="${1}"
+        shift
+        ;;
+      "--")
+        shift
+        break
+        ;;
+      -*)
+        echo "${0}: bad option '${1}'"
+        exit 1
+        ;;
+      *)
+        break
+        ;;
     esac
   done
 
@@ -72,10 +132,12 @@
       echo "==> ${file} <=="
     fi
 
-    if [ -f ~/.vimcatrc ]; then
-        vimcatrc_arg="-u ~/.vimcatrc"
-    else
-        vimcatrc_arg=""
+    if [ -z "${vimcatrc}" ]; then
+      if [ -f ~/.vimcatrc ]; then
+          vimcatrc="~/.vimcatrc"
+      else
+          vimcatrc=""
+      fi
     fi
 
     if [ "${file}" = "-" ]; then
@@ -83,15 +145,31 @@
       file=${tmp_file}
     fi
 
+    if [ -z "${extra_cmd}" ]; then
+      extra_cmd='silent! echo'
+    fi
+
+    if [ -z "${extra_c}" ]; then
+      extra_c='silent! echo'
+    fi
+
     # Check that the file exists
     if test -r "${file}" -a -f "${file}"; then
       if test -s "${file}"; then
-        vim -E -X -R -i NONE $vimcatrc_arg -c "source ${script} | ${extra_c} | visual | call AnsiHighlight(\"${tmp_file}\") | q" "${file}" </dev/tty >/dev/null 2>&1
-        cat ${tmp_file}
-        echo
+        if [ -n "${vimcatrc}" ]; then
+          vim -E -X -R -i NONE -u "${vimcatrc}" --cmd "${extra_cmd}" -c "source ${script} | ${extra_c} | visual | call AnsiHighlight(\"${tmp_file}\") | q" -- "${file}" </dev/tty >/dev/null 2>&1
+        else
+          vim -E -X -R -i NONE                  --cmd "${extra_cmd}" -c "source ${script} | ${extra_c} | visual | call AnsiHighlight(\"${tmp_file}\") | q" -- "${file}" </dev/tty >/dev/null 2>&1
+        fi
+        cat "${tmp_file}"
+        # if file doesn't end in a newline, output a newline
+        last_char=$(tail -c 1 "${tmp_file}")
+        if [ "${last_char}" != "" ]; then
+          echo
+        fi
       fi
     else
-      echo "$0: Cannot read file: ${file}" >&2
+      echo "${0}: Cannot read file: ${file}" >&2
     fi
   done
 
@@ -99,8 +177,21 @@
 
   exit
 
-: endfor
+: endif
+: endif
+: endif
+: endif
+: endif
 : endwhile
+: endif
+: endfor
+: endif
+: endif
+: endif
+: endif
+: endif
+: endif
+: endif
 : endif
 : endif
 : endif
@@ -116,7 +207,7 @@
 " License: BSD. Completely open source, but I would like to be
 " credited if you use some of this code elsewhere.
 
-" Copyright (c) 2008, Matthew J. Wozniski {{{1
+" Copyright (c) 2015, Matthew J. Wozniski {{{1
 " All rights reserved.
 "
 " Redistribution and use in source and binary forms, with or without
@@ -126,9 +217,6 @@
 " * Redistributions in binary form must reproduce the above copyright
 " notice, this list of conditions and the following disclaimer in the
 " documentation and/or other materials provided with the distribution.
-" * The names of the contributors may not be used to endorse or promote
-" products derived from this software without specific prior written
-" permission.
 "
 " THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER ``AS IS'' AND ANY
 " EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -273,7 +361,8 @@ function! AnsiHighlight(output_file)
   return writefile(retv, a:output_file)
 endfunction
 
-" See copyright in the vimscript above.
+" See copyright in the vim script above (for the vim script) and in
+" vimcat.md for the whole script.
 "
 " The list of contributors is at the bottom of the vimpager script in this
 " project.
