@@ -47,8 +47,7 @@
       export _MY_SHELL
       exec ksh "$0" "$@"
     else
-      echo "$0 requires either bash or ksh" >&2
-      exit
+      _MY_SHELL="${SHELL:-/bin/sh}"
     fi
   fi
 
@@ -120,37 +119,35 @@
     esac
   done
 
-  files=("${@}")
-
-  if [ "${#}" -eq 0 ]; then
-    files[1]="-"
+  if [ -z "${vimcatrc}" ]; then
+    if [ -f ~/.vimcatrc ]; then
+        vimcatrc="~/.vimcatrc"
+    else
+        vimcatrc=""
+    fi
   fi
 
-  for file in "${files[@]}"
-  do
-    if [ "${#files[@]}" -ge 2 ]; then
-      echo "==> ${file} <=="
-    fi
+  if [ -z "${extra_cmd}" ]; then
+    extra_cmd='silent! echo'
+  fi
 
-    if [ -z "${vimcatrc}" ]; then
-      if [ -f ~/.vimcatrc ]; then
-          vimcatrc="~/.vimcatrc"
-      else
-          vimcatrc=""
-      fi
+  if [ -z "${extra_c}" ]; then
+    extra_c='silent! echo'
+  fi
+
+  if [ "${#}" -eq 0 ]; then
+    set -- -
+  fi
+
+  for file in "$@"
+  do
+    if [ "${#}" -ge 2 ]; then
+      echo "==> ${file} <=="
     fi
 
     if [ "${file}" = "-" ]; then
       cat - >${tmp_file}
       file=${tmp_file}
-    fi
-
-    if [ -z "${extra_cmd}" ]; then
-      extra_cmd='silent! echo'
-    fi
-
-    if [ -z "${extra_c}" ]; then
-      extra_c='silent! echo'
     fi
 
     # Check that the file exists
@@ -163,7 +160,15 @@
         fi
         cat "${tmp_file}"
         # if file doesn't end in a newline, output a newline
-        last_char=$(tail -c 1 "${tmp_file}")
+        # regular Solaris tail does not work for this
+        tail_cmd=tail
+        if [ -x /usr/xpg4/bin/tail ]; then
+          tail_cmd=/usr/xpg4/bin/tail
+        fi
+        if command -v gtail >/dev/null; then
+          tail_cmd=gtail
+        fi
+        last_char=$($tail_cmd -c 1 "${tmp_file}")
         if [ "${last_char}" != "" ]; then
           echo
         fi
@@ -185,6 +190,8 @@
 : endwhile
 : endif
 : endfor
+: endif
+: endif
 : endif
 : endif
 : endif
